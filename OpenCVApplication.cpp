@@ -19,15 +19,11 @@ std::vector<Mat_<Vec3b> > generateLaplacianPyr(Mat_<Vec3b> inputImage, int layer
 
 	return ret;
 }
-void testLaplacianPyr() {
+void testLaplacianPyr(int layers) {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
 		Mat src;
 		src = imread(fname, CV_LOAD_IMAGE_COLOR);
-
-		int layers;
-		std::cout << "\nDati numarul de layere\n";
-		std::cin >> layers;
 
 		std::vector<Mat_<Vec3b> > laplacianPyr = generateLaplacianPyr(src, layers);
 
@@ -58,10 +54,34 @@ void testGaussianPyr(int noOfLayers)
 		Mat_<Vec3b> src = imread(fname, CV_LOAD_IMAGE_COLOR);
 		std::vector<Mat_<Vec3b>> gaussianPyr = generateGaussianPyr(src, noOfLayers);
 		for (int i = 0; i < gaussianPyr.size(); i++) {
-			std::string x = "asd";
+			std::string x = "gaussian pyr #";
 			x += std::to_string(i);
 			imshow(x, gaussianPyr[i]);
 		}
+		
+		waitKey();
+	}
+}
+void testBoth(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname))
+	{
+		Mat_<Vec3b> src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3b>> gaussianPyr = generateGaussianPyr(src, layers);
+		for (int i = 0; i < gaussianPyr.size(); i++) {
+			std::string x = "gaussian pyr #";
+			x += std::to_string(i);
+			imshow(x, gaussianPyr[i]);
+		}
+		std::vector<Mat_<Vec3b> > laplacianPyr = generateLaplacianPyr(src, layers);
+
+		for (int i = 0; i < laplacianPyr.size(); ++i) {
+			std::string layerName = "laplace pyr #";
+			layerName += std::to_string(i);
+			imshow(layerName, laplacianPyr[i]);
+		}
+
+		imshow("image", src);
 		waitKey();
 	}
 }
@@ -75,18 +95,25 @@ int main()
 		printf("Menu:\n");
 		printf(" 1 - Generate Gaussian Pyramid\n");
 		printf(" 2 - Generate Laplacian Pyramid\n");
+		printf(" 3 - Generate Both\n");
 		printf(" 0 - \n\n");
 		printf("Option: ");
 		scanf("%d", &op);
+		int n;
 		switch (op)
 		{
 		case 1:
-			int n;
+			
 			scanf("%d", &n);
 			testGaussianPyr(n);
 			break;
 		case 2:
-			testLaplacianPyr();
+			scanf("%d", &n);
+			testLaplacianPyr(n);
+			break;
+		case 3:
+			scanf("%d", &n);
+			testBoth(n);
 			break;
 		}
 	} while (op != 0);
