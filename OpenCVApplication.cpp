@@ -4,33 +4,17 @@
 #include "stdafx.h"
 #include "common.h"
 
+std::vector<Mat_<Vec3b>> generateGaussianPyr(Mat_<Vec3b> img, int noOfLayers);
+void testGaussianPyr(int noOfLayers);
 
-void testGaussianPyr() {
-	return;
-}
-Mat_<Vec3b> difference(Mat_<Vec3b> a, Mat_<Vec3b> b) {
-	Mat_<Vec3b> ret(a.rows, a.cols, 0);
-	if (a.rows != b.rows || a.cols != b.cols) {
-		std::cout << "\nDiferenta intre doua matrici de dimensiuni diferite\n";
-		return ret;
-	}
-	for (int i = 0; i < a.rows; ++i) {
-		for (int j = 0; j < a.cols; ++j) {
-			ret[i][j][0] = a[i][j][0] - b[i][j][0];
-			ret[i][j][1] = a[i][j][1] - b[i][j][1];
-			ret[i][j][2] = a[i][j][2] - b[i][j][2];
-		}
-	}
-	return ret;
-}
 std::vector<Mat_<Vec3b> > generateLaplacianPyr(Mat_<Vec3b> inputImage, int layers) {
 	std::vector<Mat_<Vec3b> > ret;
-	//std::vector<Mat_<Vec3b> > gaussianPyr = generateGaussianPyr(inputImage, layers);
+	std::vector<Mat_<Vec3b> > gaussianPyr = generateGaussianPyr(inputImage, layers);
 
-	for (int i = 0; i < layers; ++i) {
-		Mat_<Vec3b> test(255, 255, { 0, 0, 0 });
-
-		ret.push_back(test);
+	for (int i = gaussianPyr.size() - 1; i >= 1; --i) {
+		Mat_<Vec3b> laplacianLayer;
+		pyrUp(gaussianPyr[i], laplacianLayer, Size(gaussianPyr[i - 1].cols, gaussianPyr[i - 1].rows)); 
+		ret.push_back(gaussianPyr[i - 1] - laplacianLayer);
 	}
 
 	return ret;
@@ -45,7 +29,6 @@ void testLaplacianPyr() {
 		std::cout << "\nDati numarul de layere\n";
 		std::cin >> layers;
 
-
 		std::vector<Mat_<Vec3b> > laplacianPyr = generateLaplacianPyr(src, layers);
 
 		for (int i = 0; i < laplacianPyr.size(); ++i) {
@@ -55,6 +38,8 @@ void testLaplacianPyr() {
 		}
 
 		imshow("image", src);
+	}
+}
 std::vector<Mat_<Vec3b>> generateGaussianPyr(Mat_<Vec3b> img, int noOfLayers) {
 	std::vector<Mat_<Vec3b>> gaussianPyr;
 	Mat_<Vec3b> layer;
@@ -65,7 +50,6 @@ std::vector<Mat_<Vec3b>> generateGaussianPyr(Mat_<Vec3b> img, int noOfLayers) {
 	}
 	return gaussianPyr;
 }
-
 void testGaussianPyr(int noOfLayers)
 {
 	char fname[MAX_PATH];
@@ -81,12 +65,6 @@ void testGaussianPyr(int noOfLayers)
 		waitKey();
 	}
 }
-
-void new_function() {
-	printf("Bau Bau!");
-	printf("Bau! Bau! Ca trebuie!");
-}
-
 int main()
 {
 	int op;
@@ -106,7 +84,6 @@ int main()
 			int n;
 			scanf("%d", &n);
 			testGaussianPyr(n);
-			testGaussianPyr();
 			break;
 		case 2:
 			testLaplacianPyr();
