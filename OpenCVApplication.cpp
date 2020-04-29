@@ -7,14 +7,21 @@
 std::vector<Mat_<Vec3b>> generateGaussianPyr(Mat_<Vec3b> img, int noOfLayers);
 void testGaussianPyr(int noOfLayers);
 
-std::vector<Mat_<Vec3b> > generateLaplacianPyr(Mat_<Vec3b> inputImage, int layers) {
-	std::vector<Mat_<Vec3b> > ret;
+std::vector<Mat_<int>> generateLaplacianPyr(Mat_<Vec3b> inputImage, int layers) {
+	std::vector<Mat_<int> > ret;
 	std::vector<Mat_<Vec3b> > gaussianPyr = generateGaussianPyr(inputImage, layers);
 
 	for (int i = gaussianPyr.size() - 1; i >= 1; --i) {
 		Mat_<Vec3b> laplacianLayer;
-		pyrUp(gaussianPyr[i], laplacianLayer, Size(gaussianPyr[i - 1].cols, gaussianPyr[i - 1].rows)); 
-		ret.push_back(gaussianPyr[i - 1] - laplacianLayer);
+		pyrUp(gaussianPyr[i], laplacianLayer, Size(gaussianPyr[i - 1].cols, gaussianPyr[i - 1].rows));
+		int col = gaussianPyr[i].cols;
+		int row = gaussianPyr[i].rows;
+		Mat mat1, mat2;
+		gaussianPyr[i - 1].convertTo(mat1, CV_32SC1);
+		laplacianLayer.convertTo(mat2, CV_32SC1);
+		Mat rez = mat1 - mat2;
+
+		ret.push_back(rez);
 	}
 
 	return ret;
@@ -25,12 +32,16 @@ void testLaplacianPyr(int layers) {
 		Mat src;
 		src = imread(fname, CV_LOAD_IMAGE_COLOR);
 
-		std::vector<Mat_<Vec3b> > laplacianPyr = generateLaplacianPyr(src, layers);
-
+		std::vector<Mat_<int>> laplacianPyr = generateLaplacianPyr(src, layers);
+		std::vector<Mat_<uchar>> laplacianPyr128;
+		for (int i = 0; i < laplacianPyr.size(); ++i) {
+			laplacianPyr128.push_back(laplacianPyr[i] + 128);
+		}
+	
 		for (int i = 0; i < laplacianPyr.size(); ++i) {
 			std::string layerName = "laplace pyr #";
 			layerName += std::to_string(i);
-			imshow(layerName, laplacianPyr[i]);
+			imshow(layerName, laplacianPyr128[i]);
 		}
 
 		imshow("image", src);
@@ -73,12 +84,17 @@ void testBoth(int layers) {
 			x += std::to_string(i);
 			imshow(x, gaussianPyr[i]);
 		}
-		std::vector<Mat_<Vec3b> > laplacianPyr = generateLaplacianPyr(src, layers);
+		std::vector<Mat_<int> > laplacianPyr = generateLaplacianPyr(src, layers);
+
+		std::vector<Mat_<uchar>> laplacianPyr128;
+		for (int i = 0; i < laplacianPyr.size(); ++i) {
+			laplacianPyr128.push_back(laplacianPyr[i] + 128);
+		}
 
 		for (int i = 0; i < laplacianPyr.size(); ++i) {
 			std::string layerName = "laplace pyr #";
 			layerName += std::to_string(i);
-			imshow(layerName, laplacianPyr[i]);
+			imshow(layerName, laplacianPyr128[i]);
 		}
 
 		imshow("image", src);
