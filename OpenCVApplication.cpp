@@ -18,7 +18,7 @@ std::vector<Mat_<Vec3b>> generateGaussianPyr(Mat_<Vec3b> img, int noOfLayers) {
 	}
 	return gaussianPyr;
 }
-void testGaussianPyr(int noOfLayers){
+void testGaussianPyr(int noOfLayers) {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname))
 	{
@@ -29,7 +29,7 @@ void testGaussianPyr(int noOfLayers){
 			x += std::to_string(i);
 			printGaussianPyr(gaussianPyr[i], x);
 		}
-		
+
 		waitKey();
 	}
 }
@@ -84,8 +84,8 @@ Mat_<Vec3b> intToUchar(Mat_<Vec3i> mat) {
 std::vector<Mat_<Vec3i>> generateLaplacianPyr(Mat_<Vec3b> inputImage, int layers) {
 	std::vector<Mat_<Vec3i> > ret;
 	std::vector<Mat_<Vec3b> > gaussianPyr = generateGaussianPyr(inputImage, layers);
-	ret.push_back(ucharToInt(gaussianPyr.back()));
 
+	ret.push_back(ucharToInt(gaussianPyr.back()));
 	for (int i = gaussianPyr.size() - 1; i >= 1; --i) {
 		Mat_<Vec3b> upLayer;
 		pyrUp(gaussianPyr[i], upLayer, Size(gaussianPyr[i - 1].cols, gaussianPyr[i - 1].rows));
@@ -98,16 +98,13 @@ void testLaplacianPyr(int layers) {
 	while (openFileDlg(fname)) {
 		Mat src;
 		src = imread(fname, CV_LOAD_IMAGE_COLOR);
-
 		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
-
 		imshow("lapace pyr #0", intToUchar(laplacianPyr[0]));
 		for (int i = 1; i < laplacianPyr.size(); ++i) {
 			std::string x = "laplacian pyr #";
 			x += std::to_string(i);
 			printLaplacianImage128(laplacianPyr[i], x);
 		}
-
 		imshow("image", src);
 	}
 }
@@ -137,6 +134,9 @@ void testBoth(int layers) {
 	}
 }
 
+/*
+	Primim o piramida laplaciana ca si parametru (si nu imaginea sursa)
+*/
 Mat_<Vec3b> reconstructImage(Mat_<Vec3b> img, int layers) {
 	std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(img, layers);
 
@@ -144,7 +144,7 @@ Mat_<Vec3b> reconstructImage(Mat_<Vec3b> img, int layers) {
 	for (int i = 1; i < laplacianPyr.size(); ++i) {
 		Mat_<Vec3b> upLayer;
 		pyrUp(currentImg, upLayer, Size(laplacianPyr[i].cols, laplacianPyr[i].rows));
-		currentImg = intToUchar(laplacianPyr[i]) + upLayer;
+		currentImg = intToUchar(laplacianPyr[i] + ucharToInt(upLayer));
 	}
 	return currentImg;
 }
@@ -156,6 +156,9 @@ void testReconstruction(int layers) {
 
 		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
 		Mat_<Vec3b> rec = reconstructImage(src, layers);
+
+		imshow("Diff", (rec - src) * 10 + 128);
+
 		imshow("reconstructed", rec);
 		imshow("image", src);
 	}
@@ -179,23 +182,23 @@ int main()
 		int n;
 		switch (op)
 		{
-			case 1:
-			
-				scanf("%d", &n);
-				testGaussianPyr(n);
-				break;
-			case 2:
-				scanf("%d", &n);
-				testLaplacianPyr(n);
-				break;
-			case 3:
-				scanf("%d", &n);
-				testBoth(n);
-				break;
-			case 4:
-				scanf("%d", &n);
-				testReconstruction(n);
-				break;
+		case 1:
+
+			scanf("%d", &n);
+			testGaussianPyr(n);
+			break;
+		case 2:
+			scanf("%d", &n);
+			testLaplacianPyr(n);
+			break;
+		case 3:
+			scanf("%d", &n);
+			testBoth(n);
+			break;
+		case 4:
+			scanf("%d", &n);
+			testReconstruction(n);
+			break;
 		}
 	} while (op != 0);
 	return 0;
