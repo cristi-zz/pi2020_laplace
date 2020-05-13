@@ -5,6 +5,27 @@
 #include "common.h"
 
 
+void showHistogram(const std::string& name, int* hist, const int  hist_cols, const int hist_height){
+	Mat imgHist(hist_height, hist_cols, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
+
+	//computes histogram maximum
+	int max_hist = 0;
+	for (int i = 0; i < hist_cols; i++)
+		if (hist[i] > max_hist)
+			max_hist = hist[i];
+	double scale = 1.0;
+	scale = (double)hist_height / max_hist;
+	int baseline = hist_height - 1;
+
+	for (int x = 0; x < hist_cols; x++) {
+		Point p1 = Point(x, baseline);
+		Point p2 = Point(x, baseline - cvRound(hist[x] * scale));
+		line(imgHist, p1, p2, CV_RGB(255, 0, 255)); // histogram bins colored in magenta
+	}
+
+	imshow(name, imgHist);
+}
+
 void printGaussianPyr(Mat_<Vec3b> gaussianPyr, std::string text) {
 	imshow(text, gaussianPyr);
 }
@@ -137,7 +158,7 @@ void testBoth(int layers) {
 /*
 	Primim o piramida laplaciana ca si parametru (si nu imaginea sursa)
 */
-Mat_<Vec3b> reconstructImage(std::vector<Mat_<Vec3i>> laplacianPyr, int layers) {
+Mat_<Vec3b> reconstructImage(std::vector<Mat_<Vec3i>> laplacianPyr) {
 	//std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(img, layers);
 
 	Mat_<Vec3b> currentImg = intToUchar(laplacianPyr[0]);
@@ -155,7 +176,7 @@ void testReconstruction(int layers) {
 		src = imread(fname, CV_LOAD_IMAGE_COLOR);
 
 		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
-		Mat_<Vec3b> rec = reconstructImage(laplacianPyr, layers);
+		Mat_<Vec3b> rec = reconstructImage(laplacianPyr);
 
 		imshow("Diff", (rec - src) * 10 + 128);
 
@@ -184,7 +205,6 @@ Mat_<Vec3i> threshold(Mat_<Vec3i> laplacianPyr, int value) {
 	}
 	return dst;
 }
-
 void laplaceThreshold(int layers, int value) {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
@@ -223,7 +243,6 @@ int* histogram(Mat_<Vec3i> src) {
 	}
 	return hst;
 }
-
 float* fdp_hs(Mat_<Vec3i> src) {
 	float *fdp = (float *)calloc(511, sizeof(float));
 	int *hst = histogram(src);
@@ -233,37 +252,26 @@ float* fdp_hs(Mat_<Vec3i> src) {
 	}
 	return fdp;
 }
-
 std::vector<int> getValues(Mat_<Vec3i> src) {
-
 	float *fdp = fdp_hs(src);
-
 	int wh = 5;
 	float th = 0.0003;
-
 	std::vector<int> threshold;
-
 	for (int k = 0 + wh; k < 511 - wh; k++) {
-
 		float suma = 0;
 		bool max_local = true;
-
 		for (int i = k - wh; i < k + wh; i++) {
 			suma += fdp[i];
 			if (fdp[k] < fdp[i])
 				max_local = false;
 		}
-
 		float value = (suma / (2 * wh + 1)) + th;
-
 		if ((fdp[k] > value) && (max_local == true)) {
 			threshold.push_back(k - 255);
-			//printf(" th = %d\n", threshold[threshold.size() - 1]);
 		}
 	}
 	return threshold;
 }
-
 int findValues(std::vector<int> threshold, int val) {
 	for (int i = 0; i < threshold.size() - 1; i++) {
 		if (threshold[i] <= val && threshold[i + 1] >= val) {
@@ -276,7 +284,6 @@ int findValues(std::vector<int> threshold, int val) {
 	}
 
 }
-
 Mat_<Vec3i> quantImg(Mat_<Vec3i> img) {
 	Mat_<Vec3i> dst(img.rows, img.cols, CV_LOAD_IMAGE_UNCHANGED);
 	std::vector<int> values = getValues(img);
@@ -284,15 +291,12 @@ Mat_<Vec3i> quantImg(Mat_<Vec3i> img) {
 	for (int i = 0; i < img.rows; i++) {
 		for (int j = 0; j < img.cols; j++) {
 			for (int k = 0; k < 3; k++) {
-				//printf("%d - ", img(i, j)[k]);
 				dst(i, j)[k] = findValues(values, img(i, j)[k]);
-				//printf(" %d\n", dst(i, j)[k]);
 			}
 		}
 	}
 	return dst;
 }
-
 void quantization(int layers) {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
@@ -322,6 +326,131 @@ void quantization(int layers) {
 	}
 }
 
+Mat_<Vec3b> toImage128(Mat_<Vec3i> laplaceImg) {
+	Mat_<Vec3b> ret(laplaceImg.rows, laplaceImg.cols);
+	for (int i = 0; i < laplaceImg.rows; ++i) {
+		for (int j = 0; j < laplaceImg.cols; ++j) {
+			for (int k = 0; k < 3; ++k) {
+				int val = ((int)laplaceImg[i][j][k] + 128);
+				if (val > 255) {
+					val = 255;
+				}
+				else if (val < 0) {
+					val = 0;
+				}
+				ret[i][j][k] = (uchar)val;
+			}
+		}
+	}
+	return ret;
+}
+Mat_<Vec3b> quantSingle(Mat_<Vec3b> img, int show) {
+	Mat_<Vec3b> ret(img.rows, img.cols);
+
+	Mat_<Vec3b> img_prag(img.rows, img.cols);
+	for (int culoare = 0; culoare < 3; ++culoare) {
+		int DIM_HIST = 256;
+		std::vector<int> hist(DIM_HIST);
+		std::vector<float> FDP(DIM_HIST);
+
+		int M = 0;
+		for (int i = 0; i < img.rows; ++i) {
+			for (int j = 0; j < img.cols; ++j) {
+				hist[img(i, j)[culoare]] ++;
+				M++;
+			}
+		}
+		for (int i = 0; i < DIM_HIST; ++i) {
+			FDP[i] = 1.0 * hist[i] / M;
+		}
+		int WH = 2;
+		float TH = 0.00000003;
+		std::vector<int> praguri;
+		praguri.push_back(0);
+		for (int k = 0; k < DIM_HIST; ++k) {
+			/* Aici optim ar fii sa precalculam sumele partiale part[k] = suma
+			tuturor valorilor hist[i], 0 >= i <= k (cu ajutorul recurentei
+			part[k] = part[k - 1] + hist[k]), astfel incat sa calculam suma
+			dintre left si right (din fereastra) in O(1). */
+			int lo = max(0, k - WH);
+			int hi = min(DIM_HIST - 1, k + WH);
+			float sum = 0.0;
+			float maxx_val = -1.0;
+			for (int tt = lo; tt <= hi; ++tt) {
+				sum += FDP[tt];
+				maxx_val = max(maxx_val, FDP[tt]);
+			}
+			float medie = sum / (hi - lo + 1);
+			if (FDP[k] > medie + TH && FDP[k] >= maxx_val) {
+				praguri.push_back(k);
+			}
+		}
+		praguri.push_back(255);
+		for (int i = 0; i < img.rows; ++i) {
+			for (int j = 0; j < img.cols; ++j) {
+				int mn = 1000;
+				/*In loc de cautare liniara putem folosi cautare binara pentru
+				a reduce timpul de cautare al pragului, reducand complexitatea
+				la O(logn)*/
+				for (int k = 0; k < praguri.size(); ++k) {
+					if (abs(praguri[k] - img(i, j)[culoare]) < mn) {
+						mn = abs(praguri[k] - img(i, j)[culoare]);
+						img_prag(i, j) = praguri[k];
+						ret[i][j][culoare] = praguri[k];
+					}
+				}
+			}
+		}
+		
+		std::vector<int> hist2(256, 0);
+		for (int i = 0; i < img.rows; ++i) {
+			for (int j = 0; j < img.cols; ++j) {
+				hist2[ret(i, j)[culoare]] ++;
+			}
+		}
+		int* ptr_hist = &hist2[0];
+		
+		std::vector<int> histt(256);
+		for (int i = 0; i < img.rows; ++i) {
+			for (int j = 0; j < img.cols; ++j) {
+				histt[img(i, j)[culoare]] ++;
+			}
+		}
+		int* org_hist = &histt[0];
+		if (show == 1) {
+			std::string x = "hist quant ";
+			x += std::to_string(culoare + 1);
+			std::string y = "hist original ";
+			y += std::to_string(culoare + 1);
+			showHistogram(x, ptr_hist, img.cols, 300);
+			showHistogram(y, org_hist, img.cols, 300);
+		}
+	}
+	return ret;
+}
+void quantManualTreshold(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+		std::vector<Mat_<Vec3b>> imgQuant;
+		for (int i = 1; i < laplacianPyr.size(); i++) {
+			imgQuant.push_back(quantSingle(toImage128(laplacianPyr[i]), (laplacianPyr.size() - 1 == i)));
+		}
+		for (int i = 0; i < imgQuant.size(); ++i) {
+			std::string x = "quant pyr #";
+			x += std::to_string(i + 1);
+			imshow(x, imgQuant[i]);
+			//printLaplacianImage128(imgQuant[i], x);
+		}
+		for (int i = 1; i < laplacianPyr.size(); ++i) {
+			std::string x = "laplacian pyr #";
+			x += std::to_string(i);
+			printLaplacianImage128(laplacianPyr[i], x);
+		}
+		waitKey();
+	}
+}
 
 int main()
 {
@@ -336,7 +465,8 @@ int main()
 		printf(" 3 - Generate Both\n");
 		printf(" 4 - Reconstruct\n");
 		printf(" 5 - Laplace threshhold\n");
-		printf(" 6 - Quantization\n");
+		printf(" 6 - Quantization without manual threshold\n");
+		printf(" 7 - Quantization with manual threshold\n");
 		printf(" 0 - \n\n");
 		printf("Option: ");
 		scanf("%d", &op);
@@ -345,19 +475,22 @@ int main()
 		switch (op)
 		{
 		case 1:
-
+			printf(" layers = ");
 			scanf("%d", &n);
 			testGaussianPyr(n);
 			break;
 		case 2:
+			printf(" layers = ");
 			scanf("%d", &n);
 			testLaplacianPyr(n);
 			break;
 		case 3:
+			printf(" layers = ");
 			scanf("%d", &n);
 			testBoth(n);
 			break;
 		case 4:
+			printf(" layers = ");
 			scanf("%d", &n);
 			testReconstruction(n);
 			break;
@@ -372,6 +505,11 @@ int main()
 			printf(" layers = ");
 			scanf("%d", &n);
 			quantization(n);
+			break;
+		case 7:
+			printf(" layers = ");
+			scanf("%d", &n);
+			quantManualTreshold(n);
 			break;
 		}
 	} while (op != 0);
