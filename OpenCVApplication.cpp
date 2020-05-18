@@ -163,6 +163,7 @@ Mat_<Vec3b> reconstructImage(std::vector<Mat_<Vec3i>> laplacianPyr) {
 
 	Mat_<Vec3b> currentImg = intToUchar(laplacianPyr[0]);
 	for (int i = 1; i < laplacianPyr.size(); ++i) {
+
 		Mat_<Vec3b> upLayer;
 		pyrUp(currentImg, upLayer, Size(laplacianPyr[i].cols, laplacianPyr[i].rows));
 		currentImg = intToUchar(laplacianPyr[i] + ucharToInt(upLayer));
@@ -185,17 +186,82 @@ void testReconstruction(int layers) {
 		waitKey(0);
 	}
 }
+std::vector<int> RLE(std::vector<int> src)
+{
+	std::vector<int> dst;
+	int cnt = 0;
+	for (int i = 0; i < src.size()-1; i++)
+	{
+		cnt++;
+		int current = src[i];
+		int next = src[i + 1];
+		//daca suntem la  penultima pozitie al vectorului
+		if (i == src.size() - 2)
+		{
+			if (next == current)
+			{
+				cnt++;
+				dst.push_back(cnt);
+				dst.push_back(current);
+			}
+			else
+			{
+				dst.push_back(cnt);
+				dst.push_back(current);
+				dst.push_back(1);
+				dst.push_back(next);
+			}
+			break;
+		}
+		//daca elementrul urmator diferit de curent, initializam cnt cu 0 si incarcam in vectorul rezultat valorile
+		if (next != current)
+		{
 
+			dst.push_back(cnt);
+			dst.push_back(current);
+			cnt = 0;
+
+		}
+
+	}
+	return dst;
+}
+void test_RLE()
+{
+	int vals[] = {0, 0, 0, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 1};
+	//int vals2[] = { 1, 2, 4, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 1, 2, 3 };
+	int n = sizeof(vals) / sizeof(vals[0]);
+	std::vector<int> src;
+	for (int i = 0; i < n; i++)
+		src.push_back(vals[i]);
+
+	std::vector<int> dst = RLE(src);
+
+	std::cout << "Src array:" << std::endl;
+	for (int i = 0; i < n; i++)
+	{
+		std::cout << src[i] << " ";
+	}
+
+	std::cout <<std::endl<< "Dst array:" << std::endl;
+	for (int i = 0; i < dst.size(); i++)
+	{
+		std::cout << dst[i] << " ";
+	}
+	Sleep(15000);
+
+//	waitKey();
+}
 Mat_<Vec3i> threshold(Mat_<Vec3i> laplacianPyr, int value) {
 	Mat_<Vec3i> dst(laplacianPyr.rows, laplacianPyr.cols, CV_LOAD_IMAGE_UNCHANGED);
 
 	for (int i = 0; i < laplacianPyr.rows; i++) {
 		for (int j = 0; j < laplacianPyr.cols; j++) {
 			for (int k = 0; k < 3; k++) {
-				int pyr = std::abs(laplacianPyr(i, j)[k]);
+				int pixel = std::abs(laplacianPyr(i, j)[k]);
 
-				pyr = pyr - value;
-				if (pyr < 0) {
+			//	pixel = pixel - value;
+				if (pixel < value) {
 					dst(i, j)[k] = 0;
 				}
 				else
@@ -205,16 +271,26 @@ Mat_<Vec3i> threshold(Mat_<Vec3i> laplacianPyr, int value) {
 	}
 	return dst;
 }
-void laplaceThreshold(int layers, int value) {
+std::vector<Mat_<Vec3i>> laplaceThreshold(Mat src, int layers, int value) {
+
+
+	std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+	std::vector<Mat_<Vec3i>> dif;
+
+	for (int i = 1; i < laplacianPyr.size(); i++) 
+		dif.push_back(threshold(laplacianPyr[i], value));
+	
+	return dif;
+
+}
+void testLaplacianTreshold(int layers, int value)
+{
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
 		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
 		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
 
-		std::vector<Mat_<Vec3i>> dif;
-		for (int i = 1; i < laplacianPyr.size(); i++) {
-			dif.push_back(threshold(laplacianPyr[i], value));
-		}
+		std::vector<Mat_<Vec3i>> dif=laplaceThreshold(src,layers,value);
 
 		for (int i = 1; i < laplacianPyr.size(); ++i) {
 			std::string x = "laplacian pyr #";
@@ -230,6 +306,7 @@ void laplaceThreshold(int layers, int value) {
 
 		waitKey();
 	}
+
 }
 
 int* histogram(Mat_<Vec3i> src) {
@@ -467,6 +544,7 @@ int main()
 		printf(" 5 - Laplace threshhold\n");
 		printf(" 6 - Quantization without manual threshold\n");
 		printf(" 7 - Quantization with manual threshold\n");
+		printf(" 8 - RLE Demo\n");
 		printf(" 0 - \n\n");
 		printf("Option: ");
 		scanf("%d", &op);
@@ -499,7 +577,7 @@ int main()
 			scanf("%d", &n);
 			printf(" threshold = ");
 			scanf("%d", &t);
-			laplaceThreshold(n, t);
+			testLaplacianTreshold(n, t);
 			break;
 		case 6:
 			printf(" layers = ");
@@ -511,7 +589,11 @@ int main()
 			scanf("%d", &n);
 			quantManualTreshold(n);
 			break;
+		case 8:
+			test_RLE();
+			break;
 		}
+
 	} while (op != 0);
 	return 0;
 }
