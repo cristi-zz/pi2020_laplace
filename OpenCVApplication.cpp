@@ -529,6 +529,112 @@ void quantManualTreshold(int layers) {
 	}
 }
 
+void accumulatedHistogram(Mat_<Vec3b> laplacianLayer, int *hist) {
+	for (int i = 0; i < laplacianLayer.rows; i++) {
+		for (int j = 0; j < laplacianLayer.cols; j++) {
+			for (int k = 0; k < 3; k++) {
+				hist[laplacianLayer(i, j)[k]]++;
+			}
+		}
+	}
+}
+
+int * quantHisto(int *hist, int rows, int cols) {
+	Mat_<Vec3b> ret(rows, cols);
+	int DIM_HIST = 256;
+	int *histo_q = (int *)calloc(DIM_HIST, sizeof(int));
+	for (int culoare = 0; culoare < 3; ++culoare) {
+		std::vector<float> FDP(DIM_HIST);
+		int M = rows * cols;
+		for (int i = 0; i < DIM_HIST; ++i) {
+			FDP[i] = 1.0 * hist[i] / M;
+		}
+
+		int WH = 2;
+		float TH = 0.00000003;
+		std::vector<int> praguri;
+		for (int k = 0; k < DIM_HIST; ++k) {
+			int lo = max(0, k - WH);
+			int hi = min(DIM_HIST - 1, k + WH);
+			float sum = 0.0;
+			float maxx_val = -1.0;
+			for (int tt = lo; tt <= hi; ++tt) {
+				sum += FDP[tt];
+				maxx_val = max(maxx_val, FDP[tt]);
+			}
+			float medie = sum / (hi - lo + 1);
+			if (FDP[k] > medie + TH && FDP[k] >= maxx_val) {
+				praguri.push_back(k);
+			}
+		}
+
+		/*Nu lucram cu o imagine anume => am incercat sa ma folosesc de histograma ???*/
+		for (int i = 0; i < DIM_HIST; i++) { 
+			int value = findValues(praguri, i);
+			histo_q[value] += hist[i];
+		}
+	}
+	return histo_q;
+}
+
+Mat_<Vec3b> applyHisto(Mat_<Vec3b> laplacianLayer, int *histo_q) { //???
+	Mat_<Vec3b> newLaplacianLayer(laplacianLayer.rows, laplacianLayer.cols);
+	for (int i = 0; i < laplacianLayer.rows; i++) {
+		for (int j = 0; j < laplacianLayer.cols; j++) {
+			for (int k = 0; k < 3; k++) {
+				if (histo_q[laplacianLayer(i, j)[k]] != 0) {
+					newLaplacianLayer(i, j)[k] = laplacianLayer(i, j)[k];
+				}
+			}
+		}
+	}
+	return newLaplacianLayer;
+}
+
+void testQuantAllLayers(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+
+		int *hist = (int *)calloc(256, sizeof(int));
+		for (int i = 0; i < laplacianPyr.size(); i++) {
+			accumulatedHistogram(toImage128(laplacianPyr[i]), hist);
+		}
+
+		int *histo_q = quantHisto(hist, src.rows, src.cols); 
+
+		std::vector<Mat_<Vec3b>> L_quant;
+		std::vector<Mat_<Vec3i>> L_quant_int;
+		for (int i = 0; i < laplacianPyr.size(); i++) {
+			L_quant.push_back(applyHisto(toImage128(laplacianPyr[i]), histo_q));
+		}
+		for (int i = 0; i < laplacianPyr.size(); i++) {
+			L_quant_int.push_back(ucharToInt(L_quant[i])); //prea alba
+		}
+		/*for (int i = 0; i < L_quant.size(); ++i) {
+			std::string x = "quant pyr #";
+			x += std::to_string(i + 1);
+			imshow(x, L_quant[i]);
+		}
+		for (int i = 0; i < L_quant_int.size(); ++i) {
+			std::string x = "quant pyr int #";
+			x += std::to_string(i + 1);
+			printLaplacianImage128(L_quant_int[i], x);
+		}*/
+		
+		Mat_<Vec3b> rec = reconstructImage(L_quant_int);
+
+		imshow("Diff", (rec - src) * 10 + 128);
+		imshow("reconstructed", rec);
+		imshow("image", src);
+		showHistogram("hist", hist, src.cols, 300);
+		showHistogram("histo_q", histo_q, src.cols, 300);
+
+		waitKey();
+	}
+}
+
 int main()
 {
 	int op;
@@ -545,6 +651,7 @@ int main()
 		printf(" 6 - Quantization without manual threshold\n");
 		printf(" 7 - Quantization with manual threshold\n");
 		printf(" 8 - RLE Demo\n");
+		printf(" 9 - Quantization - all layers\n");
 		printf(" 0 - \n\n");
 		printf("Option: ");
 		scanf("%d", &op);
@@ -591,6 +698,11 @@ int main()
 			break;
 		case 8:
 			test_RLE();
+			break;
+		case 9:
+			printf(" layers = ");
+			scanf("%d", &n);
+			testQuantAllLayers(n);
 			break;
 		}
 
