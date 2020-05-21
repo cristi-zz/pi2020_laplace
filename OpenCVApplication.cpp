@@ -5,7 +5,7 @@
 #include "common.h"
 
 
-void showHistogram(const std::string& name, int* hist, const int  hist_cols, const int hist_height){
+void showHistogram(const std::string& name, int* hist, const int  hist_cols, const int hist_height) {
 	Mat imgHist(hist_height, hist_cols, CV_8UC3, CV_RGB(255, 255, 255)); // constructs a white image
 
 	//computes histogram maximum
@@ -186,72 +186,7 @@ void testReconstruction(int layers) {
 		waitKey(0);
 	}
 }
-std::vector<int> RLE(std::vector<int> src)
-{
-	std::vector<int> dst;
-	int cnt = 0;
-	for (int i = 0; i < src.size()-1; i++)
-	{
-		cnt++;
-		int current = src[i];
-		int next = src[i + 1];
-		//daca suntem la  penultima pozitie al vectorului
-		if (i == src.size() - 2)
-		{
-			if (next == current)
-			{
-				cnt++;
-				dst.push_back(cnt);
-				dst.push_back(current);
-			}
-			else
-			{
-				dst.push_back(cnt);
-				dst.push_back(current);
-				dst.push_back(1);
-				dst.push_back(next);
-			}
-			break;
-		}
-		//daca elementrul urmator diferit de curent, initializam cnt cu 0 si incarcam in vectorul rezultat valorile
-		if (next != current)
-		{
 
-			dst.push_back(cnt);
-			dst.push_back(current);
-			cnt = 0;
-
-		}
-
-	}
-	return dst;
-}
-void test_RLE()
-{
-	int vals[] = {0, 0, 0, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 1};
-	//int vals2[] = { 1, 2, 4, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 1, 2, 3 };
-	int n = sizeof(vals) / sizeof(vals[0]);
-	std::vector<int> src;
-	for (int i = 0; i < n; i++)
-		src.push_back(vals[i]);
-
-	std::vector<int> dst = RLE(src);
-
-	std::cout << "Src array:" << std::endl;
-	for (int i = 0; i < n; i++)
-	{
-		std::cout << src[i] << " ";
-	}
-
-	std::cout <<std::endl<< "Dst array:" << std::endl;
-	for (int i = 0; i < dst.size(); i++)
-	{
-		std::cout << dst[i] << " ";
-	}
-	Sleep(15000);
-
-//	waitKey();
-}
 Mat_<Vec3i> threshold(Mat_<Vec3i> laplacianPyr, int value) {
 	Mat_<Vec3i> dst(laplacianPyr.rows, laplacianPyr.cols, CV_LOAD_IMAGE_UNCHANGED);
 
@@ -260,7 +195,7 @@ Mat_<Vec3i> threshold(Mat_<Vec3i> laplacianPyr, int value) {
 			for (int k = 0; k < 3; k++) {
 				int pixel = std::abs(laplacianPyr(i, j)[k]);
 
-			//	pixel = pixel - value;
+				//	pixel = pixel - value;
 				if (pixel < value) {
 					dst(i, j)[k] = 0;
 				}
@@ -277,20 +212,20 @@ std::vector<Mat_<Vec3i>> laplaceThreshold(Mat src, int layers, int value) {
 	std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
 	std::vector<Mat_<Vec3i>> dif;
 
-	for (int i = 1; i < laplacianPyr.size(); i++) 
+	for (int i = 1; i < laplacianPyr.size(); i++)
 		dif.push_back(threshold(laplacianPyr[i], value));
-	
+
 	return dif;
 
 }
-void testLaplacianTreshold(int layers, int value)
+void testLaplacianThreshold(int layers, int value)
 {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
 		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
 		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
 
-		std::vector<Mat_<Vec3i>> dif=laplaceThreshold(src,layers,value);
+		std::vector<Mat_<Vec3i>> dif = laplaceThreshold(src, layers, value);
 
 		for (int i = 1; i < laplacianPyr.size(); ++i) {
 			std::string x = "laplacian pyr #";
@@ -307,6 +242,32 @@ void testLaplacianTreshold(int layers, int value)
 		waitKey();
 	}
 
+}
+
+Mat_<Vec3b> reconstructThresholded(std::vector<Mat_<Vec3i> > laplacianPyr, int T) {
+	std::vector<Mat_<Vec3i>> dif;
+	dif.push_back(laplacianPyr[0]);
+	for (int i = 1; i < laplacianPyr.size(); i++) {
+		dif.push_back(threshold(laplacianPyr[i], T));
+	}
+
+	Mat_<Vec3b> rec = reconstructImage(dif);
+	return rec;
+}
+void testDifferenceThreshold(int layers, int value) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+
+		Mat_<Vec3b> rec = reconstructThresholded(laplacianPyr, value);
+
+		imshow("thresholded", rec);
+		imshow("original", src);
+		imshow("dif", (src - rec) * 5 + 128);
+
+		waitKey();
+	}
 }
 
 int* histogram(Mat_<Vec3i> src) {
@@ -445,10 +406,6 @@ Mat_<Vec3b> quantSingle(Mat_<Vec3b> img, int show) {
 		std::vector<int> praguri;
 		praguri.push_back(0);
 		for (int k = 0; k < DIM_HIST; ++k) {
-			/* Aici optim ar fii sa precalculam sumele partiale part[k] = suma
-			tuturor valorilor hist[i], 0 >= i <= k (cu ajutorul recurentei
-			part[k] = part[k - 1] + hist[k]), astfel incat sa calculam suma
-			dintre left si right (din fereastra) in O(1). */
 			int lo = max(0, k - WH);
 			int hi = min(DIM_HIST - 1, k + WH);
 			float sum = 0.0;
@@ -466,9 +423,6 @@ Mat_<Vec3b> quantSingle(Mat_<Vec3b> img, int show) {
 		for (int i = 0; i < img.rows; ++i) {
 			for (int j = 0; j < img.cols; ++j) {
 				int mn = 1000;
-				/*In loc de cautare liniara putem folosi cautare binara pentru
-				a reduce timpul de cautare al pragului, reducand complexitatea
-				la O(logn)*/
 				for (int k = 0; k < praguri.size(); ++k) {
 					if (abs(praguri[k] - img(i, j)[culoare]) < mn) {
 						mn = abs(praguri[k] - img(i, j)[culoare]);
@@ -478,7 +432,7 @@ Mat_<Vec3b> quantSingle(Mat_<Vec3b> img, int show) {
 				}
 			}
 		}
-		
+
 		std::vector<int> hist2(256, 0);
 		for (int i = 0; i < img.rows; ++i) {
 			for (int j = 0; j < img.cols; ++j) {
@@ -486,7 +440,7 @@ Mat_<Vec3b> quantSingle(Mat_<Vec3b> img, int show) {
 			}
 		}
 		int* ptr_hist = &hist2[0];
-		
+
 		std::vector<int> histt(256);
 		for (int i = 0; i < img.rows; ++i) {
 			for (int j = 0; j < img.cols; ++j) {
@@ -529,6 +483,73 @@ void quantManualTreshold(int layers) {
 	}
 }
 
+std::vector<int> RLE(std::vector<int> src)
+{
+	std::vector<int> dst;
+	int cnt = 0;
+	for (int i = 0; i < src.size() - 1; i++)
+	{
+		cnt++;
+		int current = src[i];
+		int next = src[i + 1];
+		//daca suntem la  penultima pozitie al vectorului
+		if (i == src.size() - 2)
+		{
+			if (next == current)
+			{
+				cnt++;
+				dst.push_back(cnt);
+				dst.push_back(current);
+			}
+			else
+			{
+				dst.push_back(cnt);
+				dst.push_back(current);
+				dst.push_back(1);
+				dst.push_back(next);
+			}
+			break;
+		}
+		//daca elementrul urmator diferit de curent, initializam cnt cu 0 si incarcam in vectorul rezultat valorile
+		if (next != current)
+		{
+
+			dst.push_back(cnt);
+			dst.push_back(current);
+			cnt = 0;
+
+		}
+
+	}
+	return dst;
+}
+void test_RLE()
+{
+	int vals[] = { 0, 0, 0, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 1 };
+	//int vals2[] = { 1, 2, 4, 0, 25, 36, 25, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 1, 2, 3 };
+	int n = sizeof(vals) / sizeof(vals[0]);
+	std::vector<int> src;
+	for (int i = 0; i < n; i++)
+		src.push_back(vals[i]);
+
+	std::vector<int> dst = RLE(src);
+
+	std::cout << "Src array:" << std::endl;
+	for (int i = 0; i < n; i++)
+	{
+		std::cout << src[i] << " ";
+	}
+
+	std::cout << std::endl << "Dst array:" << std::endl;
+	for (int i = 0; i < dst.size(); i++)
+	{
+		std::cout << dst[i] << " ";
+	}
+	Sleep(15000);
+
+	//	waitKey();
+}
+
 void accumulatedHistogram(Mat_<Vec3b> laplacianLayer, int *hist) {
 	for (int i = 0; i < laplacianLayer.rows; i++) {
 		for (int j = 0; j < laplacianLayer.cols; j++) {
@@ -538,7 +559,6 @@ void accumulatedHistogram(Mat_<Vec3b> laplacianLayer, int *hist) {
 		}
 	}
 }
-
 int * quantHisto(int *hist, int rows, int cols) {
 	Mat_<Vec3b> ret(rows, cols);
 	int DIM_HIST = 256;
@@ -569,14 +589,13 @@ int * quantHisto(int *hist, int rows, int cols) {
 		}
 
 		/*Nu lucram cu o imagine anume => am incercat sa ma folosesc de histograma ???*/
-		for (int i = 0; i < DIM_HIST; i++) { 
+		for (int i = 0; i < DIM_HIST; i++) {
 			int value = findValues(praguri, i);
 			histo_q[value] += hist[i];
 		}
 	}
 	return histo_q;
 }
-
 Mat_<Vec3b> applyHisto(Mat_<Vec3b> laplacianLayer, int *histo_q) { //???
 	Mat_<Vec3b> newLaplacianLayer(laplacianLayer.rows, laplacianLayer.cols);
 	for (int i = 0; i < laplacianLayer.rows; i++) {
@@ -590,7 +609,6 @@ Mat_<Vec3b> applyHisto(Mat_<Vec3b> laplacianLayer, int *histo_q) { //???
 	}
 	return newLaplacianLayer;
 }
-
 void testQuantAllLayers(int layers) {
 	char fname[MAX_PATH];
 	while (openFileDlg(fname)) {
@@ -602,7 +620,7 @@ void testQuantAllLayers(int layers) {
 			accumulatedHistogram(toImage128(laplacianPyr[i]), hist);
 		}
 
-		int *histo_q = quantHisto(hist, src.rows, src.cols); 
+		int *histo_q = quantHisto(hist, src.rows, src.cols);
 
 		std::vector<Mat_<Vec3b>> L_quant;
 		std::vector<Mat_<Vec3i>> L_quant_int;
@@ -622,7 +640,7 @@ void testQuantAllLayers(int layers) {
 			x += std::to_string(i + 1);
 			printLaplacianImage128(L_quant_int[i], x);
 		}*/
-		
+
 		Mat_<Vec3b> rec = reconstructImage(L_quant_int);
 
 		imshow("Diff", (rec - src) * 10 + 128);
@@ -635,6 +653,225 @@ void testQuantAllLayers(int layers) {
 	}
 }
 
+std::vector<int> getHistogram(Mat_<Vec3i> src) {
+	std::vector<int> hist(256, 0);
+	for (int i = 0; i < src.rows; i++) {
+		for (int j = 0; j < src.cols; j++) {
+			if (src[i][j][0] + 128 < 0) {
+				hist[0] ++;
+			}
+			else if (src[i][j][0] + 128 > 255) {
+				hist[255] ++;
+			}
+			else {
+				hist[src(i, j)[0] + 128]++;
+			}
+		}
+	}
+	return hist;
+}
+std::vector<float> getFdp(Mat_<Vec3i> src) {
+	std::vector<float> fdp(256, 0.0);
+	std::vector<int> hist = getHistogram(src);
+	int M = 0;
+	for (int i = 0; i < 256; ++i) {
+		M += hist[i];
+	}
+	for (int i = 0; i < 256; i++) {
+		fdp[i] = 1.0f * hist[i] / M;
+	}
+	return fdp;
+}
+std::vector<int> getPeaks(Mat_<Vec3i> src) {
+	//float *fdp = fdp_hs(src);
+	std::vector<float> fdp = getFdp(src);
+
+	int wh = 3;
+	float th = 0.000003;
+	std::vector<int> threshold;
+	
+	for (int k = 0 + wh; k < 255 - wh; k++) {
+		float suma = 0;
+		bool max_local = true;
+		for (int i = k - wh; i <= k + wh; i++) {
+			suma += fdp[i];
+			if (fdp[k] < fdp[i] && i != k)
+				max_local = false;
+		}
+		float value = (suma / (2 * wh + 1)) + th;
+		if ((fdp[k] > value) && (max_local == true)) {
+			threshold.push_back(k);
+		}
+	}
+	return threshold;
+}
+int findPeak(std::vector<int> threshold, int val) {
+	if (val <= threshold[0]) {
+		return threshold[0];
+	}
+	if (val >= threshold.back()) {
+		return threshold.back();
+	}
+	for (int i = 0; i < threshold.size() - 1; i++) {
+		if (threshold[i] <= val && threshold[i + 1] >= val) {
+			int min_val = val - threshold[i];
+			int max_val = threshold[i + 1] - val;
+			if (min_val <= max_val)
+				return threshold[i];
+			else return threshold[i + 1];
+		}
+	}
+}
+Mat_<Vec3i> quant(Mat_<Vec3i> img) {
+	Mat_<Vec3i> dst(img.rows, img.cols);
+	std::vector<int> values = getPeaks(img);
+
+	for (int i = 0; i < img.rows; i++) {
+		for (int j = 0; j < img.cols; j++) {
+			for (int k = 0; k < 3; k++) {
+				dst(i, j)[k] = (findPeak(values, img(i, j)[k] + 128) - 128);
+			}
+		}
+	}
+	return dst;
+}
+Mat_<Vec3b> quantEach(std::vector<Mat_<Vec3i>> laplacianPyr) {
+	std::vector<Mat_<Vec3i>> laplacianQuant;
+	laplacianQuant.push_back(laplacianPyr[0]);
+	for (int i = 1; i < laplacianPyr.size(); i++) {
+		laplacianQuant.push_back(quant(laplacianPyr[i]));
+	}
+	std::vector<int> hist1 = getHistogram(laplacianQuant.back());
+	std::vector<int> hist2 = getHistogram(laplacianPyr.back());
+	//showHistogram("last pyr", &hist1[0], laplacianPyr.back().cols, 300);
+	//showHistogram("last pyr quant", &hist2[0], laplacianPyr.back().cols, 300);
+	Mat_<Vec3b> rec = reconstructImage(laplacianQuant);
+	return rec;
+}
+void testQuantEach(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+		Mat_<Vec3b> rec = quantEach(laplacianPyr);
+
+		imshow("quantEach", rec);
+		imshow("original", src);
+		imshow("dif", (src - rec) * 5 + 128);
+		waitKey();
+	}
+}
+
+std::vector<float> getFdpByHist(std::vector<int> hist) {
+	std::vector<float> fdp(256, 0.0);
+	int M = 0;
+	for (int i = 0; i < 256; ++i) {
+		M += hist[i];
+	}
+	for (int i = 0; i < 256; i++) {
+		fdp[i] = 1.0f * hist[i] / M;
+	}
+	return fdp;
+}
+void acumulare_histograma(Mat_<int> mat, std::vector<int> &hist) {
+	for (int i = 0; i < mat.rows; ++i) {
+		for (int j = 0; j < mat.cols; ++j) {
+			if (mat[i][j] + 128 > 255) {
+				hist[255] ++;
+			}
+			else if (mat[i][j] + 128 < 0) {
+				hist[0] ++;
+			}
+			else {
+				hist[mat[i][j] + 128] ++;
+			}
+		}
+	}
+}
+std::vector<int> getPeaks(std::vector<float> fdp) {
+	int wh = 3;
+	float th = 0.000003;
+	std::vector<int> threshold;
+
+	for (int k = 0 + wh; k < 255 - wh; k++) {
+		float suma = 0;
+		bool max_local = true;
+		for (int i = k - wh; i <= k + wh; i++) {
+			suma += fdp[i];
+			if (fdp[k] < fdp[i] && i != k)
+				max_local = false;
+		}
+		float value = (suma / (2 * wh + 1)) + th;
+		if ((fdp[k] > value) && (max_local == true)) {
+			threshold.push_back(k);
+		}
+	}
+	return threshold;
+}
+Mat_<Vec3i> quantByFdp(Mat_<Vec3i> img, std::vector<float> fdp) {
+	Mat_<Vec3i> dst(img.rows, img.cols);
+	std::vector<int> values = getPeaks(fdp);
+
+	for (int i = 0; i < img.rows; i++) {
+		for (int j = 0; j < img.cols; j++) {
+			for (int k = 0; k < 3; k++) {
+				dst(i, j)[k] = (findPeak(values, img(i, j)[k] + 128) - 128);
+			}
+		}
+	}
+	return dst;
+}
+Mat_<Vec3b> quantCumulative(std::vector<Mat_<Vec3i>> laplacianPyr) {
+	Mat_<Vec3b> ret;
+	std::vector<int> hist(256, 0);
+	for (int i = 1; i < laplacianPyr.size(); ++i) {
+		acumulare_histograma(laplacianPyr[i], hist);
+	}	
+	std::vector<Mat_<Vec3i>> laplacianCumulative;
+	laplacianCumulative.push_back(laplacianPyr[0]);
+	for (int i = 1; i < laplacianPyr.size(); i++) {
+		laplacianCumulative.push_back(quantByFdp(laplacianPyr[i], getFdpByHist(hist)));
+	}
+
+	std::vector<int> hist1 = getHistogram(laplacianCumulative.back());
+	std::vector<int> hist2 = getHistogram(laplacianPyr.back());
+	//showHistogram("last pyr", &hist1[0], laplacianPyr.back().cols, 300);
+	//showHistogram("last pyr quant", &hist2[0], laplacianPyr.back().cols, 300);
+	Mat_<Vec3b> rec = reconstructImage(laplacianCumulative);
+	return rec;
+}
+void testQuantCumulative(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+		Mat_<Vec3b> rec = quantCumulative(laplacianPyr);
+
+		imshow("quantEach", rec);
+		imshow("original", src);
+		imshow("dif", (src - rec) * 5 + 128);
+		waitKey();
+	}
+}
+
+void testAllReconstructions(int layers) {
+	char fname[MAX_PATH];
+	while (openFileDlg(fname)) {
+		Mat src = imread(fname, CV_LOAD_IMAGE_COLOR);
+		std::vector<Mat_<Vec3i>> laplacianPyr = generateLaplacianPyr(src, layers);
+		Mat_<Vec3b> recCumul = quantCumulative(laplacianPyr);
+		Mat_<Vec3b> recEech = quantEach(laplacianPyr);
+		Mat_<Vec3b> recThres = reconstructThresholded(laplacianPyr, 20);
+		imshow("Quan Each", recEech);
+		imshow("dif Each", (src - recEech) * 5 + 128);
+		imshow("Thresholded", recThres);
+		imshow("dif Thresholded", (src - recThres) * 5 + 128);
+		imshow("Quant Cumulative", recCumul);
+		imshow("dif Cumulative", (src - recCumul) * 5 + 128);
+		imshow("original", src);
+		waitKey();
+	}
+}
 int main()
 {
 	int op;
@@ -648,10 +885,14 @@ int main()
 		printf(" 3 - Generate Both\n");
 		printf(" 4 - Reconstruct\n");
 		printf(" 5 - Laplace threshhold\n");
-		printf(" 6 - Quantization without manual threshold\n");
-		printf(" 7 - Quantization with manual threshold\n");
-		printf(" 8 - RLE Demo\n");
-		printf(" 9 - Quantization - all layers\n");
+		printf(" 6 - Threshhold difference\n");
+		printf(" 7 - Quantization without manual threshold X\n");
+		printf(" 8 - Quantization with manual threshold X\n");
+		printf(" 9 - RLE Demo\n");
+		printf(" 10 - Quantization - all layers X\n");
+		printf(" 11 - Quantization - each\n");
+		printf(" 12 - Quantization - cumulative\n");
+		printf(" 13 - Test all reconstructions (threshold quantEach quantCumul)");
 		printf(" 0 - \n\n");
 		printf("Option: ");
 		scanf("%d", &op);
@@ -684,26 +925,47 @@ int main()
 			scanf("%d", &n);
 			printf(" threshold = ");
 			scanf("%d", &t);
-			testLaplacianTreshold(n, t);
+			testLaplacianThreshold(n, t);
 			break;
 		case 6:
 			printf(" layers = ");
 			scanf("%d", &n);
-			quantization(n);
+			printf(" threshold = ");
+			scanf("%d", &t);
+			testDifferenceThreshold(n, t);
 			break;
 		case 7:
 			printf(" layers = ");
 			scanf("%d", &n);
-			quantManualTreshold(n);
+			quantization(n);
 			break;
 		case 8:
-			test_RLE();
+			printf(" layers = ");
+			scanf("%d", &n);
+			quantManualTreshold(n);
 			break;
 		case 9:
+			test_RLE();
+			break;
+		case 10:
 			printf(" layers = ");
 			scanf("%d", &n);
 			testQuantAllLayers(n);
 			break;
+		case 11:
+			printf(" layers = ");
+			scanf("%d", &n);
+			testQuantEach(n);
+			break;
+		case 12:
+			printf(" layers = ");
+			scanf("%d", &n);
+			testQuantCumulative(n);
+			break;
+		case 13:
+			printf("layers = ");
+			scanf("%d", &n);
+			testAllReconstructions(n);
 		}
 
 	} while (op != 0);
